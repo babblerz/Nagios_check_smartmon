@@ -67,6 +67,13 @@ def parse_cmd_line(arguments):
         default="",
         help="Check all disks")
     parser.add_option(
+        "-b",
+        "--all-block",
+        action="store_true",
+        dest="allblock",
+        default="",
+        help="Check all block devices")
+    parser.add_option(
         "-v",
         "--verbosity",
         action="store",
@@ -128,10 +135,10 @@ def check_smartmontools(path):
     """
     vprint(3, "Check if %s does exist and can be read" % path)
     if not os.access(path, os.F_OK):
-        print "UNKNOWN: cannot find %s" % path
+        print("UNKNOWN: cannot find %s" % path)
         sys.exit(3)
     elif not os.access(path, os.X_OK):
-        print "UNKNOWN: cannot execute %s" % path
+        print("UNKNOWN: cannot execute %s" % path)
         sys.exit(3)
 
 
@@ -354,7 +361,7 @@ def vprint(level, text):
     printed to stdout.
     """
     if level <= verbosity:
-        print text
+        print(text)
 
 
 if __name__ == "__main__":
@@ -366,10 +373,23 @@ if __name__ == "__main__":
 
     vprint(2, "Get device name")
     # assemble device list to be monitored
-    if not options.alldisks:
+    devices = []
+    if options.allblock:
+        valid_device_name = '/dev/(?:[ahsv]d|nvme).*'
+        proc = subprocess.Popen(['lsblk', '--nodeps', '-o', 'PATH'],stdout=subprocess.PIPE)
+        while True:
+            line = proc.stdout.readline()
+            dev = bytes.decode(line.rstrip())
+            print('got ' + dev)
+            if re.match(valid_device_name, dev):
+                devices.append(dev)
+                print('found ' + dev)
+            if not line:
+                break
+        vprint(1, "Devices: %s" % devices)
+    elif not options.alldisks:
         devices = [options.device]
     else:
-        devices = []
         # Regex for Valid device name
         valid_device_name = '/dev/[ahsv]d.*'
         for partition in psutil.disk_partitions():
@@ -403,12 +423,12 @@ if __name__ == "__main__":
         if output != "":
             vprint(2, "Parse smartctl output")
             return_status, device_status = parse_output(
-                output,
+                bytes.decode(output),
                 options.warning_temp,
                 options.critical_temp)
             if exit_status < return_status:
                 exit_status = return_status
             return_text += device_status
 
-    print return_text
+    print(return_text)
     sys.exit(exit_status)
