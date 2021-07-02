@@ -60,3 +60,7 @@ target/
 
 # vim backup files
 *~
+
+# generated .deb/.rpm files
+*.deb
+*.rpm
