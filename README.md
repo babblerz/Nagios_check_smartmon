@@ -3,6 +3,18 @@
 check_smartmon is a Nagios-Plugin that uses smartmontools
 (http://smartmontools.sourceforge.net/) to check disk health status and temperature.
 
+## difference ##
+
+This version differs from the [upstream repo](https://github.com/nihlaeth/Nagios_check_smartmon)
+in these respects:
+
+* Updated for newer Debian/Ubuntu (tested on Debian 10 Buster and Ubuntu 20.04 Focal)
+* Added the --all-block option to automatically include all block devices
+* Add a sudo wrapper so that for usage under NRPE, no compiled wrapper is necessary
+* Added a quick package generation script (tested on Ubuntu and Debian, will probably work
+  on Redhat derivatives if build_RPM is set to yes -- let me know if someone tested this).
+* Includes the check_smartmon_all_block into NRPE automatically (do not forget to reload
+  nrpe using `sudo systemctl reload nagios-nrpe-server.service`)
 
 ## Installation ##
 
