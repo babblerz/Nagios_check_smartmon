@@ -380,10 +380,8 @@ if __name__ == "__main__":
         while True:
             line = proc.stdout.readline()
             dev = bytes.decode(line.rstrip())
-            print('got ' + dev)
             if re.match(valid_device_name, dev):
                 devices.append(dev)
-                print('found ' + dev)
             if not line:
                 break
         vprint(1, "Devices: %s" % devices)
