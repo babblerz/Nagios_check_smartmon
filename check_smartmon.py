@@ -74,6 +74,12 @@ def parse_cmd_line(arguments):
         default="",
         help="Check all block devices")
     parser.add_option(
+        "--ignore-unknown-bridge",
+        action="store_true",
+        dest="ignore_unknown_usb",
+        default="",
+        help="Ignore devices that report Unknown USB Bridge")
+    parser.add_option(
         "-v",
         "--verbosity",
         action="store",
@@ -155,11 +161,15 @@ def call_smartmontools(path, device):
         # smartctl passes a lot of information via the return code
         return_code = error.returncode
         if return_code % 2**1 > 0:
-            # bit 0 is set - command line did not parse
-            # output is not useful now, simply return
-            message += "UNKNOWN: smartctl parsing error "
-            return_code -= 2**0
-            code_to_return = 3
+            m = re.search(rb'Unknown USB bridge', error.output)
+            if options.ignore_unknown_usb and m:
+                return (0, "", "")
+            else:
+                # bit 0 is set - command line did not parse
+                # output is not useful now, simply return
+                message += "UNKNOWN: smartctl parsing error "
+                return_code -= 2**0
+                code_to_return = 3
         if return_code % 2**2 > 0:
             # bit 1 is set - device open failed
             # output is not useful now, simply return
