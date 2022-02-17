@@ -109,6 +109,24 @@ def parse_cmd_line(arguments):
         default="60",
         help=("set temperature critical threshold to given temperature"
               " (default:60)"))
+    parser.add_option(
+        "--warning-percentage-used",
+        metavar="TEMP",
+        action="store",
+        type="int",
+        dest="warning_percentage_used",
+        default="90",
+        help=("set life used warning threshold to given percentage"
+              " (default:90)"))
+    parser.add_option(
+        "--critical-percentage-used",
+        metavar="TEMP",
+        action="store",
+        type="int",
+        dest="critical_percentage_used",
+        default="95",
+        help=("set life used critical threshold to given percentage"
+              " (default:95)"))
 
     return parser.parse_args(arguments)
 
@@ -205,18 +223,18 @@ def call_smartmontools(path, device):
             message += "in the past "
             return_code -= 2**5
             code_to_return = 1
-        if return_code % 2**7 > 0:
-            # bit 6 is set - errors recorded in error log
-            result = error.output
-            message += "WARNING: errors recorded in error log "
-            return_code -= 2**6
-            code_to_return = 1
-        if return_code % 2**8 > 0:
-            # bit 7 is set - device self-test log contains errors
-            result = error.output
-            message += "CRITICAL: self-test log contains errors "
-            return_code -= 2**7
-            code_to_return = 2
+#        if return_code % 2**7 > 0:
+#            # bit 6 is set - errors recorded in error log
+#            result = error.output
+#            message += "WARNING: errors recorded in error log "
+#            return_code -= 2**6
+#            code_to_return = 1
+#        if return_code % 2**8 > 0:
+#            # bit 7 is set - device self-test log contains errors
+#            result = error.output
+#            message += "CRITICAL: self-test log contains errors "
+#            return_code -= 2**7
+#            code_to_return = 2
     except OSError as error:
         code_to_return = 3
         message = "UNKNOWN: call exits unexpectedly (%s)" % error
@@ -224,7 +242,7 @@ def call_smartmontools(path, device):
     return (code_to_return, result, message)
 
 
-def parse_output(output, warning_temp, critical_temp):
+def parse_output(output, short_device, warning_temp, critical_temp, warning_percentage_used, critical_percentage_used):
     """
     Parse smartctl output.
 
@@ -241,6 +259,7 @@ def parse_output(output, warning_temp, critical_temp):
     current_pending_sector = 0
     offline_uncorrectable = 0
     error_count = 0
+    percentage_used = -1
 
     lines = output.split("\n")
     for line in lines:
@@ -304,6 +323,11 @@ def parse_output(output, warning_temp, critical_temp):
                 vprint(
                     3,
                     "ATA error count: %d" % error_count)
+            elif "Percentage Used" in line:
+                percentage_used = int(parts[2].replace('%', ''))
+                vprint(
+                    3,
+                    "Percentage Used: %d" % error_count)
             elif "No Errors Logged" in line:
                 error_count = 0
                 vprint(
@@ -313,6 +337,7 @@ def parse_output(output, warning_temp, critical_temp):
     # now create the return information for this device
     return_status = 0
     device_status = ""
+    perfdata = ""
 
     # check if smartmon could read device
     if health_status == "":
@@ -350,6 +375,20 @@ def parse_output(output, warning_temp, critical_temp):
         device_status += "exceeds warning temperature "
         device_status += "threshold (%s) " % warning_temp
 
+    # check percentage_used
+    if percentage_used > critical_percentage_used:
+        return_status = 2
+        device_status += "CRITICAL: life percentage used (%d)" % percentage_used
+        device_status += "exceeds critical "
+        device_status += "threshold (%s) " % critical_percentage_used
+    elif percentage_used > warning_percentage_used:
+        # don't downgrade return status!
+        if return_status < 2:
+            return_status = 1
+        device_status += "WARNING: life percentage used (%d) " % percentage_used
+        device_status += "exceeds warning "
+        device_status += "threshold (%s) " % warning_percentage_used
+
     # check error count
     if error_count > 0:
         if return_status < 2:
@@ -359,9 +398,16 @@ def parse_output(output, warning_temp, critical_temp):
     if return_status == 0:
         # no warnings or errors, report everything is ok
         device_status = "OK: device  is functional and stable "
-        device_status += "(temperature: %d) " % temperature
+        if percentage_used < 0:
+            device_status += "(temperature: %d) " % temperature
+        else:
+            device_status += "(temperature: %d, life used: %d%%)" % (temperature, percentage_used)
+    perfdata += '%s_temperature=%d ' % (short_device, temperature)
+    perfdata += '%s_errors=%d ' % (short_device, error_count)
+    if percentage_used >= 0:
+        perfdata += '%s_life_used=%d ' % (short_device, percentage_used)
 
-    return (return_status, device_status)
+    return (return_status, device_status, perfdata)
 
 
 def vprint(level, text):
@@ -406,6 +452,7 @@ if __name__ == "__main__":
         vprint(1, "Devices: %s" % devices)
 
     return_text = ""
+    perfdata_text = "|"
     exit_status = 0
     for device in devices:
         vprint(1, "Device: %s" % device)
@@ -430,13 +477,17 @@ if __name__ == "__main__":
             return_text += message
         if output != "":
             vprint(2, "Parse smartctl output")
-            return_status, device_status = parse_output(
+            return_status, device_status, perfdata = parse_output(
                 bytes.decode(output),
+                device.replace('/dev/', '').replace('/', '_'),
                 options.warning_temp,
-                options.critical_temp)
+                options.critical_temp,
+                options.warning_percentage_used,
+                options.critical_percentage_used)
             if exit_status < return_status:
                 exit_status = return_status
             return_text += device_status
+            perfdata_text += perfdata
 
-    print(return_text)
+    print(return_text + perfdata_text)
     sys.exit(exit_status)
