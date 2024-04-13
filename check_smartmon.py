@@ -80,6 +80,12 @@ def parse_cmd_line(arguments):
         default="",
         help="Ignore devices that report Unknown USB Bridge")
     parser.add_option(
+        "--downgrade-past-prefail",
+        action="store_true",
+        dest="downgrade_past_prefail",
+        default="",
+        help="Report but do not alert on past prefail conditions")
+    parser.add_option(
         "-v",
         "--verbosity",
         action="store",
@@ -222,7 +228,8 @@ def call_smartmontools(path, device):
             message += "WARNING: some prefail attributes were critical "
             message += "in the past "
             return_code -= 2**5
-            code_to_return = 1
+            if not options.downgrade_past_prefail:
+                code_to_return = 1
 #        if return_code % 2**7 > 0:
 #            # bit 6 is set - errors recorded in error log
 #            result = error.output
