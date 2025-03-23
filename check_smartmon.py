@@ -230,18 +230,18 @@ def call_smartmontools(path, device):
             return_code -= 2**5
             if not options.downgrade_past_prefail:
                 code_to_return = 1
-#        if return_code % 2**7 > 0:
-#            # bit 6 is set - errors recorded in error log
-#            result = error.output
-#            message += "WARNING: errors recorded in error log "
-#            return_code -= 2**6
-#            code_to_return = 1
-#        if return_code % 2**8 > 0:
-#            # bit 7 is set - device self-test log contains errors
-#            result = error.output
-#            message += "CRITICAL: self-test log contains errors "
-#            return_code -= 2**7
-#            code_to_return = 2
+        if return_code % 2**7 > 0:
+            # bit 6 is set - errors recorded in error log
+            result = error.output
+            message += "WARNING: errors recorded in error log "
+            return_code -= 2**6
+            code_to_return = 1
+        if return_code % 2**8 > 0:
+            # bit 7 is set - device self-test log contains errors
+            result = error.output
+            message += "CRITICAL: self-test log contains errors "
+            return_code -= 2**7
+            code_to_return = 2
     except OSError as error:
         code_to_return = 3
         message = "UNKNOWN: call exits unexpectedly (%s)" % error
