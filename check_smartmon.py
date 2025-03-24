@@ -304,6 +304,11 @@ def parse_output(output, short_device, warning_temp, critical_temp, warning_perc
                 # 194 is the temperature value id
                 temperature = int(parts[9])
                 vprint(3, "Temperature: %d" % temperature)
+            elif "Temperature:" in line:
+                # extract temperature
+                # unnumbered temperature as last resort
+                temperature = int(parts[1])
+                vprint(3, "Temperature: %d" %temperature)
             elif parts[0] == "196" and reallocated_event_count == 0:
                 # extract reallocated_event_count
                 # 196 is the reallocated_event_count id
